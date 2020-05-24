@@ -23,7 +23,7 @@ func init() {
 }
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	m:= new(Metrics)
+	m := new(Metrics)
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
 }
@@ -38,7 +38,7 @@ var once sync.Once
 // Metrics holds the prometheus configuration.
 type Metrics struct {
 	Addr           string `json:"addr,omitempty"`
-	UseCaddyAddr   bool `json:"use_caddy_addr,omitempty"`
+	UseCaddyAddr   bool   `json:"use_caddy_addr,omitempty"`
 	Hostname       string `json:"hostname,omitempty"`
 	Path           string `json:"path,omitempty"`
 	extraLabels    []extraLabel
@@ -57,11 +57,11 @@ type extraLabel struct {
 
 // Provision initialize the metrics plugin
 func (m *Metrics) Provision(ctx caddy.Context) error {
-		m.handler = promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
-			ErrorHandling: promhttp.HTTPErrorOnError,
-			ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
-		})
-		return m.start()
+	m.handler = promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
+		ErrorHandling: promhttp.HTTPErrorOnError,
+		ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
+	})
+	return m.start()
 }
 
 // UnmarshalCaddyfile: ?
@@ -80,7 +80,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			return d.ArgErr()
 		}
 		addrSet := false
-		for nesting:= d.Nesting(); d.NextBlock(nesting); {
+		for nesting := d.Nesting(); d.NextBlock(nesting); {
 			fmt.Printf("nesting=%d, d.Val=%v\n", nesting, d.Val())
 			switch d.Val() {
 			case "Path":
@@ -158,7 +158,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 func (Metrics) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID: "http.handlers.prometheus",
-		New: func() caddy.Module {  // This only creates an empty metrics plugin instance
+		New: func() caddy.Module { // This only creates an empty metrics plugin instance
 			return NewMetrics()
 		},
 	}
