@@ -1,8 +1,8 @@
 module github.com/miekg/caddy-prometheus
 
-go 1.12
+go 1.14
 
 require (
-	github.com/caddyserver/caddy v1.0.1
-	github.com/prometheus/client_golang v1.0.0
+	github.com/caddyserver/caddy/v2 v2.0.0
+	github.com/prometheus/client_golang v1.6.0
 )

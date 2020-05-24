@@ -1,19 +1,18 @@
 package metrics
 
 import (
+	"bytes"
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/caddyserver/caddy/caddyhttp/httpserver"
 )
 
-func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
-	next := m.next
-
-	hostname := m.hostname
+func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	hostname := m.Hostname
 
 	if hostname == "" {
 		originalHostname, err := host(r)
@@ -26,11 +25,12 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	start := time.Now()
 
 	// Record response to get status code and size of the reply.
-	rw := httpserver.NewResponseRecorder(w)
+	rw := caddyhttp.NewResponseRecorder(w, bytes.NewBuffer(nil), func(status int, header http.Header) bool { return false })
 	// Get time to first write.
 	tw := &timedResponseWriter{ResponseWriter: rw}
 
-	status, err := next.ServeHTTP(tw, r)
+	err := next.ServeHTTP(tw, r)
+	status := tw.ResponseWriter.(caddyhttp.ResponseRecorder).Status()
 
 	// If nothing was explicitly written, consider the request written to
 	// now that it has completed.
@@ -58,11 +58,17 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	statusStr := strconv.Itoa(stat)
 
-	replacer := httpserver.NewReplacer(r, rw, "")
+	// TODO
+	//replacer := httpserver.NewReplacer(r, rw, "")
+	//var extraLabelValues []string
+	//
+	//for _, label := range m.extraLabels {
+	//	extraLabelValues = append(extraLabelValues, replacer.Replace(label.value))
+	//}
+	replacer := caddy.NewReplacer()
 	var extraLabelValues []string
-
 	for _, label := range m.extraLabels {
-		extraLabelValues = append(extraLabelValues, replacer.Replace(label.value))
+		extraLabelValues = append(extraLabelValues, replacer.ReplaceAll(label.value, ""))
 	}
 
 	requestCount.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Inc()
@@ -71,7 +77,7 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	responseStatus.WithLabelValues(append([]string{hostname, fam, proto, statusStr}, extraLabelValues...)...).Inc()
 	responseLatency.WithLabelValues(append([]string{hostname, fam, proto, statusStr}, extraLabelValues...)...).Observe(tw.firstWrite.Sub(start).Seconds())
 
-	return status, err
+	return err
 }
 
 func host(r *http.Request) (string, error) {

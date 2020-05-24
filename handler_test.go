@@ -10,7 +10,7 @@ import (
 
 	"net/http/httptest"
 
-	"github.com/caddyserver/caddy/caddyhttp/httpserver"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 func TestMetrics_ServeHTTP(t *testing.T) {
@@ -24,7 +24,7 @@ func TestMetrics_ServeHTTP(t *testing.T) {
 	}
 
 	type fields struct {
-		next httpserver.Handler
+		next caddyhttp.Handler
 		addr string
 	}
 	type args struct {
@@ -74,7 +74,7 @@ func TestMetrics_ServeHTTP(t *testing.T) {
 				w: httptest.NewRecorder(),
 				r: proxyRequest,
 			},
-			want:    0,
+			want:    200,
 			wantErr: false,
 		},
 		{
@@ -93,23 +93,23 @@ func TestMetrics_ServeHTTP(t *testing.T) {
 	}
 
 	m := &Metrics{
-		next:    tests[0].fields.next,
-		addr:    tests[0].fields.addr,
+		Addr:    tests[0].fields.addr,
 		once:    sync.Once{},
 		handler: promhttp.Handler(),
-		path:    "/metrics",
+		Path:    "/metrics",
 	}
 	m.start()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := m.ServeHTTP(tt.args.w, tt.args.r)
+			err := m.ServeHTTP(tt.args.w, tt.args.r, tests[0].fields.next)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Metrics.ServeHTTP() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			got := tt.args.w.(*httptest.ResponseRecorder).Code
 			if got != tt.want {
-				t.Errorf("Metrics.ServeHTTP() = %v, want %v", got, tt.want)
+				t.Errorf("Metrics.ServeHTTP() [%v] = %v, want %v", tt.name, got, tt.want)
 			}
 		})
 	}
@@ -139,21 +139,18 @@ func TestIsIPv6(t *testing.T) {
 
 type testHandler struct{}
 
-func (h testHandler) ServeHTTP(_ http.ResponseWriter, r *http.Request) (int, error) {
-	var (
-		status int
-		err    error
-	)
+func (h testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
+	var err error
 
 	switch r.URL.Path {
 	case "/success":
-		status = 200
+		w.WriteHeader(200)
 	case "/error":
-		status = 500
+		w.WriteHeader(500)
 	case "/proxyerror":
-		status = 502
+		w.WriteHeader(502)
 		err = errors.New("no hosts available upstream")
 	}
 
-	return status, err
+	return err
 }

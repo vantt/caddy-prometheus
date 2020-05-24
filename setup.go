@@ -1,6 +1,12 @@
 package metrics
 
 import (
+	"fmt"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"os"
@@ -8,17 +14,18 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/caddyserver/caddy"
-	"github.com/caddyserver/caddy/caddyhttp/httpserver"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/caddyserver/caddy/v2"
 )
 
 func init() {
-	caddy.RegisterPlugin("prometheus", caddy.Plugin{
-		ServerType: "http",
-		Action:     setup,
-	})
+	caddy.RegisterModule(NewMetrics())
+	httpcaddyfile.RegisterHandlerDirective("prometheus", parseCaddyfile)
+}
+
+func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	m:= new(Metrics)
+	err := m.UnmarshalCaddyfile(h.Dispenser)
+	return m, err
 }
 
 const (
@@ -30,11 +37,10 @@ var once sync.Once
 
 // Metrics holds the prometheus configuration.
 type Metrics struct {
-	next           httpserver.Handler
-	addr           string // where to we listen
-	useCaddyAddr   bool
-	hostname       string
-	path           string
+	Addr           string `json:"addr,omitempty"`
+	UseCaddyAddr   bool `json:"use_caddy_addr,omitempty"`
+	Hostname       string `json:"hostname,omitempty"`
+	Path           string `json:"path,omitempty"`
 	extraLabels    []extraLabel
 	latencyBuckets []float64
 	sizeBuckets    []float64
@@ -49,15 +55,125 @@ type extraLabel struct {
 	value string
 }
 
-// NewMetrics -
+// Provision initialize the metrics plugin
+func (m *Metrics) Provision(ctx caddy.Context) error {
+		m.handler = promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.HTTPErrorOnError,
+			ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
+		})
+		return m.start()
+}
+
+// UnmarshalCaddyfile: ?
+func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	for d.Next() {
+		//if metrics != nil {
+		//	return nil, d.Err("prometheus: can only have one metrics module per server")
+		//}
+		args := d.RemainingArgs()
+
+		switch len(args) {
+		case 0:
+		case 1:
+			m.Addr = args[0]
+		default:
+			return d.ArgErr()
+		}
+		addrSet := false
+		for nesting:= d.Nesting(); d.NextBlock(nesting); {
+			fmt.Printf("nesting=%d, d.Val=%v\n", nesting, d.Val())
+			switch d.Val() {
+			case "Path":
+				args = d.RemainingArgs()
+				if len(args) != 1 {
+					return d.ArgErr()
+				}
+				m.Path = args[0]
+			case "address":
+				if m.UseCaddyAddr {
+					return d.Err("prometheus: address and use_caddy_addr options may not be used together")
+				}
+				args = d.RemainingArgs()
+				if len(args) != 1 {
+					return d.ArgErr()
+				}
+				m.Addr = args[0]
+				addrSet = true
+			case "Hostname":
+				args = d.RemainingArgs()
+				if len(args) != 1 {
+					return d.ArgErr()
+				}
+				m.Hostname = args[0]
+			case "use_caddy_addr":
+				if addrSet {
+					return d.Err("prometheus: address and use_caddy_addr options may not be used together")
+				}
+				m.UseCaddyAddr = true
+			case "label":
+				args = d.RemainingArgs()
+				if len(args) != 2 {
+					return d.ArgErr()
+				}
+
+				labelName := strings.TrimSpace(args[0])
+				labelValuePlaceholder := args[1]
+
+				m.extraLabels = append(m.extraLabels, extraLabel{name: labelName, value: labelValuePlaceholder})
+			case "latency_buckets":
+				args = d.RemainingArgs()
+				if len(args) < 1 {
+					return d.Err("prometheus: must specify 1 or more latency buckets")
+				}
+				m.latencyBuckets = make([]float64, len(args))
+				for i, v := range args {
+					b, err := strconv.ParseFloat(v, 64)
+					if err != nil {
+						return d.Errf("prometheus: invalid bucket %q - must be a number", v)
+					}
+					m.latencyBuckets[i] = b
+				}
+			case "size_buckets":
+				args = d.RemainingArgs()
+				if len(args) < 1 {
+					return d.Err("prometheus: must specify 1 or more size buckets")
+				}
+				m.sizeBuckets = make([]float64, len(args))
+				for i, v := range args {
+					b, err := strconv.ParseFloat(v, 64)
+					if err != nil {
+						return d.Errf("prometheus: invalid bucket %q - must be a number", v)
+					}
+					m.sizeBuckets[i] = b
+				}
+			default:
+				return d.Errf("prometheus: unknown item: %s", d.Val())
+			}
+		}
+	}
+	return nil
+}
+
+// CaddyModule provides module information to Caddy
+func (Metrics) CaddyModule() caddy.ModuleInfo {
+	return caddy.ModuleInfo{
+		ID: "http.handlers.prometheus",
+		New: func() caddy.Module {  // This only creates an empty metrics plugin instance
+			return NewMetrics()
+		},
+	}
+}
+
+// NewMetrics creates an empty Metrics with default settings
 func NewMetrics() *Metrics {
 	return &Metrics{
-		path:        defaultPath,
-		addr:        defaultAddr,
+		Path:        defaultPath,
+		Addr:        defaultAddr,
 		extraLabels: []extraLabel{},
 	}
 }
 
+// start registers Prometheus routes and (optionally) starts an HTTP server to handle client scraps
 func (m *Metrics) start() error {
 	m.once.Do(func() {
 		m.define("")
@@ -68,10 +184,10 @@ func (m *Metrics) start() error {
 		prometheus.MustRegister(responseSize)
 		prometheus.MustRegister(responseStatus)
 
-		if !m.useCaddyAddr {
-			http.Handle(m.path, m.handler)
+		if !m.UseCaddyAddr {
+			http.Handle(m.Path, m.handler)
 			go func() {
-				err := http.ListenAndServe(m.addr, nil)
+				err := http.ListenAndServe(m.Addr, nil)
 				if err != nil {
 					log.Printf("[ERROR] Starting handler: %v", err)
 				}
@@ -89,136 +205,4 @@ func (m *Metrics) extraLabelNames() []string {
 	}
 
 	return names
-}
-
-func setup(c *caddy.Controller) error {
-	metrics, err := parse(c)
-	if err != nil {
-		return err
-	}
-
-	metrics.handler = promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
-		ErrorHandling: promhttp.HTTPErrorOnError,
-		ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
-	})
-
-	once.Do(func() {
-		c.OnStartup(metrics.start)
-	})
-
-	cfg := httpserver.GetConfig(c)
-	if metrics.useCaddyAddr {
-		cfg.AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
-			return httpserver.HandlerFunc(func(w http.ResponseWriter, r *http.Request) (int, error) {
-				if r.URL.Path == metrics.path {
-					metrics.handler.ServeHTTP(w, r)
-					return 0, nil
-				}
-				return next.ServeHTTP(w, r)
-			})
-		})
-	}
-	cfg.AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
-		metrics.next = next
-		return metrics
-	})
-	return nil
-}
-
-// prometheus {
-//	address localhost:9180
-// }
-// Or just: prometheus localhost:9180
-func parse(c *caddy.Controller) (*Metrics, error) {
-	var (
-		metrics *Metrics
-		err     error
-	)
-
-	for c.Next() {
-		if metrics != nil {
-			return nil, c.Err("prometheus: can only have one metrics module per server")
-		}
-		metrics = NewMetrics()
-		args := c.RemainingArgs()
-
-		switch len(args) {
-		case 0:
-		case 1:
-			metrics.addr = args[0]
-		default:
-			return nil, c.ArgErr()
-		}
-		addrSet := false
-		for c.NextBlock() {
-			switch c.Val() {
-			case "path":
-				args = c.RemainingArgs()
-				if len(args) != 1 {
-					return nil, c.ArgErr()
-				}
-				metrics.path = args[0]
-			case "address":
-				if metrics.useCaddyAddr {
-					return nil, c.Err("prometheus: address and use_caddy_addr options may not be used together")
-				}
-				args = c.RemainingArgs()
-				if len(args) != 1 {
-					return nil, c.ArgErr()
-				}
-				metrics.addr = args[0]
-				addrSet = true
-			case "hostname":
-				args = c.RemainingArgs()
-				if len(args) != 1 {
-					return nil, c.ArgErr()
-				}
-				metrics.hostname = args[0]
-			case "use_caddy_addr":
-				if addrSet {
-					return nil, c.Err("prometheus: address and use_caddy_addr options may not be used together")
-				}
-				metrics.useCaddyAddr = true
-			case "label":
-				args = c.RemainingArgs()
-				if len(args) != 2 {
-					return nil, c.ArgErr()
-				}
-
-				labelName := strings.TrimSpace(args[0])
-				labelValuePlaceholder := args[1]
-
-				metrics.extraLabels = append(metrics.extraLabels, extraLabel{name: labelName, value: labelValuePlaceholder})
-			case "latency_buckets":
-				args = c.RemainingArgs()
-				if len(args) < 1 {
-					return nil, c.Err("prometheus: must specify 1 or more latency buckets")
-				}
-				metrics.latencyBuckets = make([]float64, len(args))
-				for i, v := range args {
-					b, err := strconv.ParseFloat(v, 64)
-					if err != nil {
-						return nil, c.Errf("prometheus: invalid bucket %q - must be a number", v)
-					}
-					metrics.latencyBuckets[i] = b
-				}
-			case "size_buckets":
-				args = c.RemainingArgs()
-				if len(args) < 1 {
-					return nil, c.Err("prometheus: must specify 1 or more size buckets")
-				}
-				metrics.sizeBuckets = make([]float64, len(args))
-				for i, v := range args {
-					b, err := strconv.ParseFloat(v, 64)
-					if err != nil {
-						return nil, c.Errf("prometheus: invalid bucket %q - must be a number", v)
-					}
-					metrics.sizeBuckets[i] = b
-				}
-			default:
-				return nil, c.Errf("prometheus: unknown item: %s", c.Val())
-			}
-		}
-	}
-	return metrics, err
 }
