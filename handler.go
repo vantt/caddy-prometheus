@@ -12,6 +12,12 @@ import (
 )
 
 func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	// If use_caddy_addr is configured, we're hijacking `m.Path` for prometheus endpoint
+	if m.UseCaddyAddr && r.URL.Path == m.Path {
+		m.handler.ServeHTTP(w, r)
+		return nil
+	}
+
 	hostname := m.Hostname
 
 	if hostname == "" {
