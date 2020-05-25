@@ -83,7 +83,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		for nesting := d.Nesting(); d.NextBlock(nesting); {
 			fmt.Printf("nesting=%d, d.Val=%v\n", nesting, d.Val())
 			switch d.Val() {
-			case "Path":
+			case "path":
 				args = d.RemainingArgs()
 				if len(args) != 1 {
 					return d.ArgErr()
@@ -99,7 +99,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				m.Addr = args[0]
 				addrSet = true
-			case "Hostname":
+			case "hostname":
 				args = d.RemainingArgs()
 				if len(args) != 1 {
 					return d.ArgErr()
