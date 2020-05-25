@@ -1,15 +1,13 @@
 package metrics
 
 import (
-	"fmt"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,9 +43,9 @@ type Metrics struct {
 	latencyBuckets []float64
 	sizeBuckets    []float64
 	// subsystem?
-	once sync.Once
-
+	once    sync.Once
 	handler http.Handler
+	logger  *zap.Logger
 }
 
 type extraLabel struct {
@@ -55,13 +53,24 @@ type extraLabel struct {
 	value string
 }
 
+// Println implements promhttp.Logger interface, so `*Metrics` can be used as `ErrorLog`
+func (m *Metrics) Println(v ...interface{}) {
+	m.logger.Sugar().Error(v...)
+}
+
 // Provision initialize the metrics plugin
 func (m *Metrics) Provision(ctx caddy.Context) error {
+	m.logger = ctx.Logger(m)
 	m.handler = promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.HTTPErrorOnError,
-		ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
+		ErrorLog:      m,
 	})
 	return m.start()
+}
+
+func (m *Metrics) Cleanup() error {
+	// TODO Stop http.handle gorountine?
+	return m.logger.Sync()
 }
 
 // UnmarshalCaddyfile: ?
@@ -81,7 +90,6 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		}
 		addrSet := false
 		for nesting := d.Nesting(); d.NextBlock(nesting); {
-			fmt.Printf("nesting=%d, d.Val=%v\n", nesting, d.Val())
 			switch d.Val() {
 			case "path":
 				args = d.RemainingArgs()
@@ -189,7 +197,7 @@ func (m *Metrics) start() error {
 			go func() {
 				err := http.ListenAndServe(m.Addr, nil)
 				if err != nil {
-					log.Printf("[ERROR] Starting handler: %v", err)
+					m.logger.Error("start prometheus handler", zap.Error(err))
 				}
 			}()
 		}
