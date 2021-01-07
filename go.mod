@@ -1,4 +1,4 @@
-module github.com/miekg/caddy-prometheus
+module github.com/vantt/caddy-prometheus
 
 go 1.14
 
