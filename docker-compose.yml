@@ -1,0 +1,53 @@
+version: "3.8"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  prometheus:
+
+configs:
+  caddyfile:
+    file: ./etc/Caddyfile
+  prometheus:
+    file: ./etc/prometheus.yml
+
+services:
+  caddy:
+    image: vantt/caddy:2.3.0
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - 2019:2019
+    configs:
+      - source: Caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - ./etc/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+
+  prometheus:
+      image: prom/prometheus:latest
+      ports:
+        - 9090:9090
+      command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+      configs:
+        - source: prometheus
+          target: /etc/prometheus/prometheus.yml
+      volumes:
+        - prometheus:/prometheus
+        - ./etc/prometheus.yml:/etc/prometheus/prometheus.yml
+      deploy:
+        mode: replicated
+        replicas: 1
+        placement:
+          constraints:
+            - node.role == manager
+        resources:
+          limits:
+            memory: 2048M
+          reservations:
+            memory: 128M
