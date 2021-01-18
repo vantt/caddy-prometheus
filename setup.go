@@ -15,12 +15,20 @@ import (
 	"github.com/caddyserver/caddy/v2"
 )
 
+var zapLogger *zap.Logger
+
 func init() {
+	config := zap.NewProductionConfig()
+	config.OutputPaths = []string{"stdout"}
+	zapLogger, _ = config.Build()
+
+	zapLogger.Sugar().Infow("vantt vantt hello1")
 	caddy.RegisterModule(NewMetrics())
 	httpcaddyfile.RegisterHandlerDirective("prometheus", parseCaddyfile)
 }
 
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	zapLogger.Sugar().Infow("vantt vantt hello2")
 	m := new(Metrics)
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
@@ -75,7 +83,10 @@ func (m *Metrics) Cleanup() error {
 
 // UnmarshalCaddyfile: ?
 func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	zapLogger.Sugar().Infow("vantt vantt hello3")
+
 	for d.Next() {
+		zapLogger.Sugar().Debugw("vantt vantt hello 4", d.Val())
 		//if metrics != nil {
 		//	return nil, d.Err("prometheus: can only have one metrics module per server")
 		//}
@@ -126,8 +137,9 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 
 				labelName := strings.TrimSpace(args[0])
 				labelValuePlaceholder := args[1]
-
+				zapLogger.Sugar().Infow("vantt vantt 5", labelName, labelValuePlaceholder)
 				m.extraLabels = append(m.extraLabels, extraLabel{name: labelName, value: labelValuePlaceholder})
+				zapLogger.Sugar().Infow("vantt vantt 5b", "names", len(m.extraLabels))
 			case "latency_buckets":
 				args = d.RemainingArgs()
 				if len(args) < 1 {
@@ -206,11 +218,13 @@ func (m *Metrics) start() error {
 }
 
 func (m *Metrics) extraLabelNames() []string {
+	zapLogger.Sugar().Infow("vantt vantt 9a", "names", len(m.extraLabels))
 	names := make([]string, 0, len(m.extraLabels))
 
 	for _, label := range m.extraLabels {
 		names = append(names, label.name)
 	}
-
+	zapLogger.Sugar().Infow("vantt vantt 9a", "names", len(names))
+	zapLogger.Sugar().Infow("vantt vantt 9b", "names", names)
 	return names
 }

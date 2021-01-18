@@ -1,11 +1,13 @@
 {
     debug    
-    order prometheus first
+    order prometheus after header
 }
 
 localhost:80 {
-    prometheus 
-    
+    prometheus {
+        label route_name 123
+    }
+
 	@path1 {        
         path /path1
     }

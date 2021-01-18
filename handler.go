@@ -76,7 +76,7 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 	for _, label := range m.extraLabels {
 		extraLabelValues = append(extraLabelValues, replacer.ReplaceAll(label.value, ""))
 	}
-
+	m.logger.Sugar().Infow("vantt 10", "value", extraLabelValues[0])
 	requestCount.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Inc()
 	requestDuration.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Observe(time.Since(start).Seconds())
 	responseSize.WithLabelValues(append([]string{hostname, fam, proto, statusStr}, extraLabelValues...)...).Observe(float64(rw.Size()))

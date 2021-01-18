@@ -4,7 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const namespace = "caddy"
+const namespace = "caddy2"
 
 var (
 	requestCount    *prometheus.CounterVec
@@ -26,7 +26,7 @@ func (m Metrics) define(subsystem string) {
 	}
 
 	extraLabels := m.extraLabelNames()
-
+	m.logger.Sugar().Infow("vantt vantt 7", len(extraLabels))
 	requestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: namespace,
 		Subsystem: subsystem,
