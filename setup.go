@@ -13,26 +13,8 @@ import (
 	"sync"
 
 	"github.com/caddyserver/caddy/v2"
+    "github.com/davecgh/go-spew/spew"
 )
-
-var zapLogger *zap.Logger
-
-func init() {
-	config := zap.NewProductionConfig()
-	config.OutputPaths = []string{"stdout"}
-	zapLogger, _ = config.Build()
-
-	zapLogger.Sugar().Infow("vantt vantt hello1")
-	caddy.RegisterModule(NewMetrics())
-	httpcaddyfile.RegisterHandlerDirective("prometheus", parseCaddyfile)
-}
-
-func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	zapLogger.Sugar().Infow("vantt vantt hello2")
-	m := new(Metrics)
-	err := m.UnmarshalCaddyfile(h.Dispenser)
-	return m, err
-}
 
 const (
 	defaultPath = "/metrics"
@@ -41,13 +23,20 @@ const (
 
 var once sync.Once
 
+// Interface guards
+var (
+	_ caddy.Provisioner           = (*Metrics)(nil)
+	_ caddyhttp.MiddlewareHandler = (*Metrics)(nil)
+	_ caddyfile.Unmarshaler       = (*Metrics)(nil)
+)
+
 // Metrics holds the prometheus configuration.
 type Metrics struct {
-	Addr           string `json:"addr,omitempty"`
-	UseCaddyAddr   bool   `json:"use_caddy_addr,omitempty"`
-	Hostname       string `json:"hostname,omitempty"`
-	Path           string `json:"path,omitempty"`
-	extraLabels    []extraLabel
+	Addr           string       `json:"addr,omitempty"`
+	UseCaddyAddr   bool         `json:"use_caddy_addr,omitempty"`
+	Hostname       string       `json:"hostname,omitempty"`
+	Path           string       `json:"path,omitempty"`
+	Labels         []extraLabel `json:"labels"`
 	latencyBuckets []float64
 	sizeBuckets    []float64
 	// subsystem?
@@ -57,13 +46,30 @@ type Metrics struct {
 }
 
 type extraLabel struct {
-	name  string
-	value string
+	Name  string `json:"name,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
-// Println implements promhttp.Logger interface, so `*Metrics` can be used as `ErrorLog`
-func (m *Metrics) Println(v ...interface{}) {
-	m.logger.Sugar().Error(v...)
+var zapLogger *zap.Logger
+
+func init() {
+	config := zap.NewProductionConfig()
+	config.OutputPaths = []string{"stdout"}
+	zapLogger, _ = config.Build()
+
+
+	caddy.RegisterModule(Metrics{})
+	httpcaddyfile.RegisterHandlerDirective("prometheus", parseCaddyfile)
+}
+
+// CaddyModule provides module information to Caddy
+func (Metrics) CaddyModule() caddy.ModuleInfo {
+	return caddy.ModuleInfo{
+		ID: "http.handlers.prometheus",
+		New: func() caddy.Module { // This only creates an empty metrics plugin instance
+			return NewMetrics()
+		},
+	}
 }
 
 // Provision initialize the metrics plugin
@@ -81,15 +87,29 @@ func (m *Metrics) Cleanup() error {
 	return m.logger.Sync()
 }
 
+// NewMetrics creates an empty Metrics with default settings
+func NewMetrics() *Metrics {
+	return &Metrics{
+		Path:   defaultPath,
+		Addr:   defaultAddr,
+		Labels: []extraLabel{},
+	}
+}
+
+func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	var m Metrics
+	err := m.UnmarshalCaddyfile(h.Dispenser)
+	return m, err
+}
+
+// Println implements promhttp.Logger interface, so `*Metrics` can be used as `ErrorLog`
+func (m *Metrics) Println(v ...interface{}) {
+	m.logger.Sugar().Error(v...)
+}
+
 // UnmarshalCaddyfile: ?
 func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
-	zapLogger.Sugar().Infow("vantt vantt hello3")
-
 	for d.Next() {
-		zapLogger.Sugar().Debugw("vantt vantt hello 4", d.Val())
-		//if metrics != nil {
-		//	return nil, d.Err("prometheus: can only have one metrics module per server")
-		//}
 		args := d.RemainingArgs()
 
 		switch len(args) {
@@ -108,6 +128,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.Path = args[0]
+
 			case "address":
 				if m.UseCaddyAddr {
 					return d.Err("prometheus: address and use_caddy_addr options may not be used together")
@@ -118,17 +139,20 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				m.Addr = args[0]
 				addrSet = true
+
 			case "hostname":
 				args = d.RemainingArgs()
 				if len(args) != 1 {
 					return d.ArgErr()
 				}
 				m.Hostname = args[0]
+
 			case "use_caddy_addr":
 				if addrSet {
 					return d.Err("prometheus: address and use_caddy_addr options may not be used together")
 				}
 				m.UseCaddyAddr = true
+
 			case "label":
 				args = d.RemainingArgs()
 				if len(args) != 2 {
@@ -138,8 +162,8 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				labelName := strings.TrimSpace(args[0])
 				labelValuePlaceholder := args[1]
 				zapLogger.Sugar().Infow("vantt vantt 5", labelName, labelValuePlaceholder)
-				m.extraLabels = append(m.extraLabels, extraLabel{name: labelName, value: labelValuePlaceholder})
-				zapLogger.Sugar().Infow("vantt vantt 5b", "names", len(m.extraLabels))
+				m.Labels = append(m.Labels, extraLabel{Name: labelName, Value: labelValuePlaceholder})
+
 			case "latency_buckets":
 				args = d.RemainingArgs()
 				if len(args) < 1 {
@@ -153,6 +177,7 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					}
 					m.latencyBuckets[i] = b
 				}
+
 			case "size_buckets":
 				args = d.RemainingArgs()
 				if len(args) < 1 {
@@ -166,31 +191,14 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					}
 					m.sizeBuckets[i] = b
 				}
+
 			default:
 				return d.Errf("prometheus: unknown item: %s", d.Val())
 			}
 		}
 	}
+
 	return nil
-}
-
-// CaddyModule provides module information to Caddy
-func (Metrics) CaddyModule() caddy.ModuleInfo {
-	return caddy.ModuleInfo{
-		ID: "http.handlers.prometheus",
-		New: func() caddy.Module { // This only creates an empty metrics plugin instance
-			return NewMetrics()
-		},
-	}
-}
-
-// NewMetrics creates an empty Metrics with default settings
-func NewMetrics() *Metrics {
-	return &Metrics{
-		Path:        defaultPath,
-		Addr:        defaultAddr,
-		extraLabels: []extraLabel{},
-	}
 }
 
 // start registers Prometheus routes and (optionally) starts an HTTP server to handle client scraps
@@ -218,13 +226,11 @@ func (m *Metrics) start() error {
 }
 
 func (m *Metrics) extraLabelNames() []string {
-	zapLogger.Sugar().Infow("vantt vantt 9a", "names", len(m.extraLabels))
-	names := make([]string, 0, len(m.extraLabels))
+	names := make([]string, 0, len(m.Labels))
 
-	for _, label := range m.extraLabels {
-		names = append(names, label.name)
+	for _, label := range m.Labels {
+		names = append(names, label.Name)
 	}
-	zapLogger.Sugar().Infow("vantt vantt 9a", "names", len(names))
-	zapLogger.Sugar().Infow("vantt vantt 9b", "names", names)
+
 	return names
 }

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/davecgh/go-spew/spew"
 )
 
 const namespace = "caddy2"
@@ -14,7 +15,7 @@ var (
 	responseLatency *prometheus.HistogramVec
 )
 
-func (m Metrics) define(subsystem string) {
+func (m *Metrics) define(subsystem string) {
 	if subsystem == "" {
 		subsystem = "http"
 	}
@@ -26,7 +27,7 @@ func (m Metrics) define(subsystem string) {
 	}
 
 	extraLabels := m.extraLabelNames()
-	m.logger.Sugar().Infow("vantt vantt 7", len(extraLabels))
+
 	requestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: namespace,
 		Subsystem: subsystem,

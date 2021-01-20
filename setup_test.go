@@ -13,8 +13,8 @@ func TestParse(t *testing.T) {
 		shouldErr bool
 		expected  *Metrics
 	}{
-		{`prometheus`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{}}},
-		{`prometheus foo:123`, false, &Metrics{Addr: "foo:123", Path: defaultPath, extraLabels: []extraLabel{}}},
+		{`prometheus`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{}}},
+		{`prometheus foo:123`, false, &Metrics{Addr: "foo:123", Path: defaultPath, Labels: []extraLabel{}}},
 		{`prometheus foo bar`, true, nil},
 		{`prometheus {
 			a b
@@ -40,30 +40,30 @@ func TestParse(t *testing.T) {
 		}`, true, nil},
 		{`prometheus {
 			use_caddy_addr
-		}`, false, &Metrics{UseCaddyAddr: true, Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{}}},
+		}`, false, &Metrics{UseCaddyAddr: true, Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{}}},
 		{`prometheus {
 			Path /foo
-		}`, false, &Metrics{Addr: defaultAddr, Path: "/foo", extraLabels: []extraLabel{}}},
+		}`, false, &Metrics{Addr: defaultAddr, Path: "/foo", Labels: []extraLabel{}}},
 		{`prometheus {
 			use_caddy_addr
 			Hostname example.com
-		}`, false, &Metrics{UseCaddyAddr: true, Hostname: "example.com", Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{}}},
+		}`, false, &Metrics{UseCaddyAddr: true, Hostname: "example.com", Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{}}},
 		{`prometheus {
 			label version 1.2
 			label route_name {<X-Route-Name}
-		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{extraLabel{"version", "1.2"}, extraLabel{"route_name", "{<X-Route-Name}"}}}},
+		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{extraLabel{"version", "1.2"}, extraLabel{"route_name", "{<X-Route-Name}"}}}},
 		{`prometheus {
 			latency_buckets
 		}`, true, nil},
 		{`prometheus {
 			latency_buckets 0.1 2 5 10
-		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{}, latencyBuckets: []float64{0.1, 2, 5, 10}}},
+		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{}, latencyBuckets: []float64{0.1, 2, 5, 10}}},
 		{`prometheus {
 			size_buckets
 		}`, true, nil},
 		{`prometheus {
 			size_buckets 1 5 10 50 100 1e3 10e6
-		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, extraLabels: []extraLabel{}, sizeBuckets: []float64{1, 5, 10, 50, 100, 1e3, 10e6}}},
+		}`, false, &Metrics{Addr: defaultAddr, Path: defaultPath, Labels: []extraLabel{}, sizeBuckets: []float64{1, 5, 10, 50, 100, 1e3, 10e6}}},
 	}
 	for i, test := range tests {
 		h := httpcaddyfile.Helper{

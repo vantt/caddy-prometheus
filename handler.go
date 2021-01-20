@@ -2,8 +2,8 @@ package metrics
 
 import (
 	"bytes"
-	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	//"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/http"
 	"strconv"
@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+
 	// If use_caddy_addr is configured, we're hijacking `m.Path` for prometheus endpoint
 	if m.UseCaddyAddr && r.URL.Path == m.Path {
 		m.handler.ServeHTTP(w, r)
@@ -32,11 +33,13 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 
 	// Record response to get status code and size of the reply.
 	rw := caddyhttp.NewResponseRecorder(w, bytes.NewBuffer(nil), func(status int, header http.Header) bool { return false })
+
 	// Get time to first write.
 	tw := &timedResponseWriter{ResponseWriter: rw}
 
 	err := next.ServeHTTP(tw, r)
 	status := tw.ResponseWriter.(caddyhttp.ResponseRecorder).Status()
+
 
 	// If nothing was explicitly written, consider the request written to
 	// now that it has completed.
@@ -68,15 +71,18 @@ func (m *Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 	//replacer := httpserver.NewReplacer(r, rw, "")
 	//var extraLabelValues []string
 	//
-	//for _, label := range m.extraLabels {
+	//for _, label := range m.Labels {
 	//	extraLabelValues = append(extraLabelValues, replacer.Replace(label.value))
 	//}
-	replacer := caddy.NewReplacer()
+
+	replacer := caddyhttp.NewReplacer(r, rw, "")
 	var extraLabelValues []string
-	for _, label := range m.extraLabels {
-		extraLabelValues = append(extraLabelValues, replacer.ReplaceAll(label.value, ""))
+	for _, label := range m.Labels {
+		extraLabelValues = append(extraLabelValues, replacer.ReplaceAll(label.Value, ""))
 	}
+
 	m.logger.Sugar().Infow("vantt 10", "value", extraLabelValues[0])
+
 	requestCount.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Inc()
 	requestDuration.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Observe(time.Since(start).Seconds())
 	responseSize.WithLabelValues(append([]string{hostname, fam, proto, statusStr}, extraLabelValues...)...).Observe(float64(rw.Size()))

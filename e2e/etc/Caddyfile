@@ -1,11 +1,13 @@
 {
     debug    
-    order prometheus after header
+    order prometheus last
 }
 
 localhost:80 {
     prometheus {
-        label route_name 123
+        label route_name {X-Route-Name}
+        label route_name2 {<X-Route-Name>}
+        label route_name3 <X-Route-Name>
     }
 
 	@path1 {        
