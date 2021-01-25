@@ -1,6 +1,6 @@
 {
     debug    
-    order prometheus last
+    order prometheus first
 }
 
 localhost:80 {
@@ -13,7 +13,7 @@ localhost:80 {
     }
 
     handle @path1 {
-        respond "Hello path1" 
+        respond "Hello path1" 200
 
         header {
             "X-Route-Name" "/path1"
@@ -25,12 +25,14 @@ localhost:80 {
                 "X-Route-Name" "/path2"
         }
 
-        respond "Hello path2"
+        respond "Hello path2" 200
     }
 
     prometheus {
+        address 0.0.0.0:2081
+        path    /metrics
         label route_name {>Server}
-        label route_name2 {>Server}
+        label route_name2 {>X-Route-Name}
     }
 
     metrics /metrics

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew"
 )
 
 func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
@@ -19,7 +19,6 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 		m.handler.ServeHTTP(w, r)
 		return nil
 	}
-
 	hostname := m.Hostname
 
 	if hostname == "" {
@@ -41,16 +40,14 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	err := next.ServeHTTP(tw, r)
 
 	status := tw.ResponseWriter.(caddyhttp.ResponseRecorder).Status()
-	spew.Dump(status)
+
 	// If nothing was explicitly written, consider the request written to
 	// now that it has completed.
 	tw.didWrite()
 
 	// Transparently capture the status code so as to not side effect other plugins
 	stat := status
-	spew.Dump(status)
 	if err != nil && status == 0 {
-		spew.Dump(status)
 		// Some middlewares set the status to 0, but return an non nil error: map these to status 500
 		stat = 500
 	} else if status == 0 {
@@ -58,7 +55,6 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 		// Note that if 'proxy' encounters an error, it returns the appropriate status code (such as 502)
 		// from ServeHTTP and is captured above with 'stat := status'.
 		stat = rw.Status()
-		spew.Dump(status)
 	}
 
 	fam := "1"

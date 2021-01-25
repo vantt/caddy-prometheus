@@ -28,15 +28,47 @@ With `caddyext` you'll need to put this module early in the chain, so that
 the duration histogram actually makes sense. I've put it at number 0.
 
 ## Sample Config
+```
+{
+    debug
+    order prometheus first
+}
+
 localhost:80 {
+	@path1 {
+        path /path1
+    }
+
+	@path2 {
+        path /path2
+    }
+
+    handle @path1 {
+        respond "Hello path1" 200
+
+        header {
+            "X-Route-Name" "/path1"
+        }
+    }
+
+    handle @path2 {
+        header {
+                "X-Route-Name" "/path2"
+        }
+
+        respond "Hello path2" 200
+    }
+
     prometheus {
-        label name1 {>X-HEADER-NAME1}
-        label name2 {>X-HEADER-NAME2}
+        address 0.0.0.0:2081
+        path    /metrics
+        label route_name {>Server}
+        label route_name2 {>X-Route-Name}
     }
 
     metrics /metrics
 }
-
+```
 
 ## Metrics
 

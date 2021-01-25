@@ -212,8 +212,9 @@ func (m *Metrics) start() error {
 		if !m.UseCaddyAddr {
 			http.Handle(m.Path, m.handler)
 			go func() {
-				err := http.ListenAndServe(m.Addr, nil)
-				if err != nil {
+				if err := http.ListenAndServe(m.Addr, nil); err == nil {
+					m.logger.Info("start prometheus handler at", zap.String("address", m.Addr))
+				} else {
 					m.logger.Error("start prometheus handler", zap.Error(err))
 				}
 			}()
