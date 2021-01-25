@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/caddyserver/caddy/v2"
-    "github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -50,13 +49,12 @@ type extraLabel struct {
 	Value string `json:"value,omitempty"`
 }
 
-var zapLogger *zap.Logger
+//var zapLogger *zap.Logger
 
 func init() {
-	config := zap.NewProductionConfig()
-	config.OutputPaths = []string{"stdout"}
-	zapLogger, _ = config.Build()
-
+	//config := zap.NewProductionConfig()
+	//config.OutputPaths = []string{"stdout"}
+	//zapLogger, _ = config.Build()
 
 	caddy.RegisterModule(Metrics{})
 	httpcaddyfile.RegisterHandlerDirective("prometheus", parseCaddyfile)
@@ -161,7 +159,6 @@ func (m *Metrics) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 
 				labelName := strings.TrimSpace(args[0])
 				labelValuePlaceholder := args[1]
-				zapLogger.Sugar().Infow("vantt vantt 5", labelName, labelValuePlaceholder)
 				m.Labels = append(m.Labels, extraLabel{Name: labelName, Value: labelValuePlaceholder})
 
 			case "latency_buckets":

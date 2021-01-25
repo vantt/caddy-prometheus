@@ -22,10 +22,21 @@ These are the (optional) parameters that can be used:
     This directive can be used multiple times.  
     You should specify a label name and a value.  
     The value is a [placeholder](https://caddyserver.com/docs/placeholders) and can be used to extract value from response header for instance.  
-    Usage: `label route_name {<X-Route-Name}`
+    Usage: `label route_name {>X-Route-Name}`
 
 With `caddyext` you'll need to put this module early in the chain, so that
 the duration histogram actually makes sense. I've put it at number 0.
+
+## Sample Config
+localhost:80 {
+    prometheus {
+        label name1 {>X-HEADER-NAME1}
+        label name2 {>X-HEADER-NAME2}
+    }
+
+    metrics /metrics
+}
+
 
 ## Metrics
 

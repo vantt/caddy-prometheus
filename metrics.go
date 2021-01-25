@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/davecgh/go-spew/spew"
 )
 
 const namespace = "caddy2"

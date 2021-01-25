@@ -2,13 +2,14 @@ package metrics
 
 import (
 	"bytes"
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	//"github.com/davecgh/go-spew/spew"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"github.com/davecgh/go-spew/spew"
 )
 
 func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
@@ -38,16 +39,18 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 	tw := &timedResponseWriter{ResponseWriter: rw}
 
 	err := next.ServeHTTP(tw, r)
+
 	status := tw.ResponseWriter.(caddyhttp.ResponseRecorder).Status()
-
-
+	spew.Dump(status)
 	// If nothing was explicitly written, consider the request written to
 	// now that it has completed.
 	tw.didWrite()
 
 	// Transparently capture the status code so as to not side effect other plugins
 	stat := status
+	spew.Dump(status)
 	if err != nil && status == 0 {
+		spew.Dump(status)
 		// Some middlewares set the status to 0, but return an non nil error: map these to status 500
 		stat = 500
 	} else if status == 0 {
@@ -55,6 +58,7 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 		// Note that if 'proxy' encounters an error, it returns the appropriate status code (such as 502)
 		// from ServeHTTP and is captured above with 'stat := status'.
 		stat = rw.Status()
+		spew.Dump(status)
 	}
 
 	fam := "1"
@@ -67,21 +71,13 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 
 	statusStr := strconv.Itoa(stat)
 
-	// TODO
-	//replacer := httpserver.NewReplacer(r, rw, "")
-	//var extraLabelValues []string
-	//
-	//for _, label := range m.Labels {
-	//	extraLabelValues = append(extraLabelValues, replacer.Replace(label.value))
-	//}
+	replacer := caddy.NewReplacer()
+	replacer.Map(headerReplacementFunc(tw.Header()))
 
-	replacer := caddyhttp.NewReplacer(r, rw, "")
 	var extraLabelValues []string
 	for _, label := range m.Labels {
 		extraLabelValues = append(extraLabelValues, replacer.ReplaceAll(label.Value, ""))
 	}
-
-	m.logger.Sugar().Infow("vantt 10", "value", extraLabelValues[0])
 
 	requestCount.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Inc()
 	requestDuration.WithLabelValues(append([]string{hostname, fam, proto}, extraLabelValues...)...).Observe(time.Since(start).Seconds())
@@ -91,6 +87,17 @@ func (m Metrics) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
 
 	return err
 }
+
+func headerReplacementFunc(h http.Header) caddy.ReplacerFunc {
+	return func (key string) (interface{}, bool) {
+		const envPrefix = ">"
+		if strings.HasPrefix(key, envPrefix) {
+			return h.Get(key[1:]), true
+		}
+		return nil, false
+	}
+}
+
 
 func host(r *http.Request) (string, error) {
 	host, _, err := net.SplitHostPort(r.Host)

@@ -4,12 +4,6 @@
 }
 
 localhost:80 {
-    prometheus {
-        label route_name {X-Route-Name}
-        label route_name2 {<X-Route-Name>}
-        label route_name3 <X-Route-Name>
-    }
-
 	@path1 {        
         path /path1
     }
@@ -27,11 +21,16 @@ localhost:80 {
     }
 
     handle @path2 {
-        respond "Hello path2" 
-
         header {
-            "X-Route-Name" "/path2"
+                "X-Route-Name" "/path2"
         }
+
+        respond "Hello path2"
+    }
+
+    prometheus {
+        label route_name {>Server}
+        label route_name2 {>Server}
     }
 
     metrics /metrics
