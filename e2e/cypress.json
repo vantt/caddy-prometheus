@@ -1,0 +1,6 @@
+{
+    "watchForFileChanges": true,
+
+    "_comment":  "this make Cypress allow cross-domain visit()",
+    "chromeWebSecurity": false
+}
