@@ -1,4 +1,2 @@
 #!/bin/bash
-
-cd docker
-docker-compose -f docker-compose.yml -f cypress-compose.yml  --env-file ".env.test" up
+docker-compose -f docker-compose.yml --env-file ".test.env" up

@@ -1,20 +1,34 @@
-describe('Client Credential Test', () => {
-    it('Does not do much!', () => {
+describe('Caddy correctly setup', () => {
+    it('Can access /path1', () => {
         cy
-            .request('/test-connect/client-credentials')
+            .request('/path1')
+            .then((response) => {
+                expect(response.status).to.equal(200)
+                expect(response.body).to.equal('Hello path1')
+            })
+    })
+
+    it('Can access /path2', () => {
+        cy
+            .request('/path2')
             .then((response) => {
                 // response.body is automatically serialized into JSON
-                expect(response.body).to.have.property('scope') // true
-                expect(response.body).to.have.property('token_type') // true
-                expect(response.body).to.have.property('access_token') // true
-                expect(response.body).to.have.property('expires') // true
+                expect(response.status).to.equal(200)
+                expect(response.body).to.equal('Hello path2')
             })
     })
 })
 
-// $this->assertArrayHasKey('expires', $token);
-// $this->assertArrayHasKey('access_token', $token);
-// $this->assertArrayHasKey('token_type', $token);
-// $this->assertSame('bearer', $token['token_type']);
-// $this->assertNotEmpty($token['access_token']);
-// $this->assertIsInt($token['expires']);
+
+describe('Caddy correctly expose metrics', () => {
+    it('Metric show correctly', () => {
+        cy
+            .request(Cypress.env('METRICS_URL'))
+            .then((response) => {
+                // response.body is automatically serialized into JSON
+                expect(response.status).to.equal(200)
+                expect(response.body).to.contains('caddy2_http_request_count_total{family="1",host="caddy",proto="1.1",route_name="/path1",server="Caddy"} 1')
+                expect(response.body).to.contains('caddy2_http_request_count_total{family="1",host="caddy",proto="1.1",route_name="/path2",server="Caddy"} 1')
+            })
+    })
+})

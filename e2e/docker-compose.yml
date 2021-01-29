@@ -4,13 +4,12 @@ volumes:
   caddy_data:
   caddy_config:
   prometheus:
-  grafana:
-
-configs:
-  caddyfile:
-    file: ./etc/Caddyfile
-  prometheus:
-    file: ./etc/prometheus.yml
+  cypressVolume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: $PWD
 
 services:
   caddy:
@@ -20,36 +19,37 @@ services:
       - "80:80"
       - 2019:2019
       - 2081:2081
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
     volumes:
       - ./etc/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
 
+  # Cypress container
+  cypress:
+    # the Docker image to use from https://github.com/cypress-io/cypress-docker-images
+    image: "cypress/included:6.3.0"
+    environment:
+      # pass base url to test pointing at the web application
+      - CYPRESS_BASE_URL=${CADDY_HOST}
+      - CYPRESS_METRICS_URL=${CADDY_HOST}:2081/metrics
+      - CYPRESS_PROM_URL=${CADDY_HOST}:9090/tsdb-status
+    volumes:
+      - cypressVolume:/app
+      # for Cypress to communicate with the X11 server pass this socket file
+      # in addition to any other mapped volumes
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    # share the current folder as volume to avoid copying
+    working_dir: /app
+    depends_on:
+      - caddy
 
-  prometheus:
-      image: prom/prometheus:latest
-      ports:
-        - 9090:9090
-      command:
-        - '--config.file=/etc/prometheus/prometheus.yml'
-        - '--storage.tsdb.path=/prometheus'
-      configs:
-        - source: prometheus
-          target: /etc/prometheus/prometheus.yml
-      volumes:
-        - prometheus:/prometheus
-        - ./etc/prometheus.yml:/etc/prometheus/prometheus.yml
-      deploy:
-        mode: replicated
-        replicas: 1
-        placement:
-          constraints:
-            - node.role == manager
-        resources:
-          limits:
-            memory: 2048M
-          reservations:
-            memory: 128M
+#  prometheus:
+#      image: prom/prometheus:latest
+#      ports:
+#        - 9090:9090
+#      command:
+#        - '--config.file=/etc/prometheus/prometheus.yml'
+#        - '--storage.tsdb.path=/prometheus'
+#      volumes:
+#        - prometheus:/prometheus
+#        - ./etc/prometheus.yml:/etc/prometheus/prometheus.yml

@@ -3,7 +3,7 @@
     order prometheus first
 }
 
-localhost:80 {
+:80 {
 	@path1 {        
         path /path1
     }
@@ -31,8 +31,8 @@ localhost:80 {
     prometheus {
         address 0.0.0.0:2081
         path    /metrics
-        label route_name {>Server}
-        label route_name2 {>X-Route-Name}
+        label server {>Server}
+        label route_name {>X-Route-Name}
     }
 
     metrics /metrics
