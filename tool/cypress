@@ -1,0 +1,5 @@
+#!/bin/bash
+DOCKER_IMAGE=cypress/included:4.9.0
+$IP=10.254.254.254
+
+docker run -it -v $PWD:/e2e -v /tmp/.X11-unix:/tmp/.X11-unix -w /e2e -e $IP:0 --entrypoint=cypress cypress/included:4.9.0 open
