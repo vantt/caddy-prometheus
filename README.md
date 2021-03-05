@@ -2,6 +2,13 @@
 
 This module enables prometheus metrics for Caddy v2 (with custom-labels through HTTP Response Headers).
 
+## Build
+Use the docker file to build caddy docker image.
+
+```
+docker build -t caddy .
+```
+
 ## Use
 
 You'll need to put this module early in the chain, so that the duration histogram actually makes sense. I've put it at number 0.
@@ -61,8 +68,8 @@ localhost:80 {
     prometheus {
         address 0.0.0.0:2081
         path    /metrics
-        label route_name {>Server}
-        label route_name2 {>X-Route-Name}
+        label server {>Server}
+        label route_name {>X-Route-Name}
     }
 
     #metrics /metrics
