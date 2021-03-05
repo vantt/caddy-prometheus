@@ -1,18 +1,20 @@
 # Metrics
 
-This module enables prometheus metrics for Caddy.
+This module enables prometheus metrics for Caddy v2 (with custom-labels through HTTP Response Headers).
 
 ## Use
 
-In your `Caddyfile`:
+You'll need to put this module early in the chain, so that the duration histogram actually makes sense. I've put it at number 0.
+In your `Caddyfile`, at global section:
 
-~~~
-prometheus
-~~~
+```
+{
+    debug
+    order prometheus first
+}
+```
 
-For each virtual host that you want to see metrics for.
-
-These are the (optional) parameters that can be used:
+For each virtual host that you want to see metrics for, these are the (optional) parameters that can be used:
 
   - **use_caddy_addr** - causes metrics to be exposed at the same address:port as Caddy itself. This can not be specified at the same time as **address**.
   - **address** - the address where the metrics are exposed, the default is `localhost:9180`
@@ -21,11 +23,8 @@ These are the (optional) parameters that can be used:
   - **label** - Custom label to add on all metrics.
     This directive can be used multiple times.  
     You should specify a label name and a value.  
-    The value is a [placeholder](https://caddyserver.com/docs/placeholders) and can be used to extract value from response header for instance.  
+    The value is a placeholder {>HEADER-NAME} and can be used to extract value from response headers.  
     Usage: `label route_name {>X-Route-Name}`
-
-With `caddyext` you'll need to put this module early in the chain, so that
-the duration histogram actually makes sense. I've put it at number 0.
 
 ## Sample Config
 ```
@@ -66,7 +65,7 @@ localhost:80 {
         label route_name2 {>X-Route-Name}
     }
 
-    metrics /metrics
+    #metrics /metrics
 }
 ```
 
@@ -74,11 +73,11 @@ localhost:80 {
 
 The following metrics are exported:
 
-* caddy_http_request_count_total{host, family, proto}
-* caddy_http_request_duration_seconds{host, family, proto}
-* caddy_http_response_latency_seconds{host, family, proto, status}
-* caddy_http_response_size_bytes{host, family, proto, status}
-* caddy_http_response_status_count_total{host, family, proto, status}
+* caddy_http_request_count_total{host, family, proto, ...labels}
+* caddy_http_request_duration_seconds{host, family, proto, ...labels}
+* caddy_http_response_latency_seconds{host, family, proto, status, ...labels}
+* caddy_http_response_size_bytes{host, family, proto, status, ...labels}
+* caddy_http_response_status_count_total{host, family, proto, status, ...labels}
 
 Each metric has the following labels:
 
